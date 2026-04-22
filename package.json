@@ -7,17 +7,17 @@
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
-    "grammy": "^1.21.1",
-    "better-sqlite3": "^9.4.3",
-    "@ton/ton": "^13.9.0",
-    "@ton/crypto": "^3.2.0",
     "@ton/core": "^0.56.3",
-    "dotenv": "^16.4.5"
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^13.11.2",
+    "better-sqlite3": "^9.4.3",
+    "dotenv": "^16.4.5",
+    "grammy": "^1.21.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^20.11.5",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "@types/node": "^20.19.39",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }
