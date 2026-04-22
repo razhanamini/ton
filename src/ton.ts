@@ -1,4 +1,4 @@
-import { TonClient, WalletContractV4, internal, toNano, fromNano, Address } from '@ton/ton';
+import { TonClient, WalletContractV4, internal, toNano, fromNano, Address, WalletContractV3R1, WalletContractV2R1 } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 
 export function getTonClient(): TonClient {
@@ -18,7 +18,7 @@ export async function getAdminWallet() {
 
 export async function getAdminAddress(): Promise<string> {
   const { wallet } = await getAdminWallet();
-  return wallet.address.toString({ bounceable: false });
+  return wallet.address.toString({ bounceable: false , testOnly: true });
 }
 
 export async function getAdminBalance(): Promise<string> {
