@@ -1,0 +1,23 @@
+{
+  "name": "ton-bet-bot",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "better-sqlite3": "^9.4.3",
+    "@ton/ton": "^13.9.0",
+    "@ton/crypto": "^3.2.0",
+    "@ton/core": "^0.56.3",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
