@@ -2,13 +2,16 @@ version: "3.9"
 
 services:
   bot:
-    build: .
+    image: ton-bot:latest
     restart: unless-stopped
     env_file: .env
     volumes:
       - db_data:/data
     environment:
       - DB_PATH=/data/bets.db
+    # Add network mode if needed
+    network_mode: bridge
 
 volumes:
   db_data:
+    driver: local

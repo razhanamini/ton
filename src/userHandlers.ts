@@ -5,7 +5,7 @@ import {
 } from './db';
 import { buildPaymentLink, getAdminAddress, isValidTonAddress } from './ton';
 import { getSession, setSession, clearSession } from './session';
-import { formatBetCard } from './format';
+import { esc, formatBetCard } from './format';
 
 const MIN_BET = 0.1;
 
@@ -75,7 +75,7 @@ export function registerUserHandlers(bot: Bot) {
     const userId = ctx.from?.id;
     if (!userId) return;
     const positions = getUserPositions(userId);
-    if (!positions.length) return ctx.reply("You haven't placed any bets yet.");
+    if (!positions || positions.length===0) return ctx.reply("You haven't placed any bets yet.");
 
     await ctx.reply(`📊 *Your Bets:*`, { parse_mode: 'Markdown' });
     for (const pos of positions) {
@@ -158,7 +158,7 @@ export function registerUserHandlers(bot: Bot) {
     setSession(ctx.from.id, { step: 'bet:amount', data: { betId, side } });
     await ctx.reply(
       `You chose *${side.toUpperCase()}* on:\n📋 _${bet.statement}_\n\n` +
-      `How many TON do you want to bet? \\(min ${MIN_BET}\\)\n` +
+      `How many TON do you want to bet? \\(min ${esc(MIN_BET.toString())}\\)\n` +
       `Reply with a number, e\\.g\\. \`0\\.5\``,
       { parse_mode: 'MarkdownV2' }
     );

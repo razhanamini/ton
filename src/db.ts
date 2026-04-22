@@ -133,7 +133,7 @@ export function getUserPositions(userId: number) {
      FROM positions p JOIN bets b ON p.bet_id = b.id
      WHERE p.user_id = ?
      ORDER BY p.created_at DESC`
-  ).all() as (Position & Bet)[];
+  ).all(userId) as (Position & Bet)[];
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
