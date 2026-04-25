@@ -47,6 +47,20 @@ function migrate(db: Database.Database) {
       created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // Add missing columns to existing tables
+  try {
+    db.exec(`ALTER TABLE positions ADD COLUMN status TEXT DEFAULT 'pending_payment'`);
+  } catch (e: any) {
+    // Column already exists — ignore error
+    if (!e.message.includes('duplicate column name')) throw e;
+  }
+  
+  try {
+    db.exec(`ALTER TABLE positions ADD COLUMN paid_out INTEGER NOT NULL DEFAULT 0`);
+  } catch (e: any) {
+    if (!e.message.includes('duplicate column name')) throw e;
+  }
 }
 
 // ── Users ──────────────────────────────────────────────────────────────
