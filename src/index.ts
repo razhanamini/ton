@@ -1,28 +1,36 @@
 import 'dotenv/config';
-import { Bot } from 'grammy';
-import { registerAdminHandlers } from './adminHandlers';
-import { registerUserHandlers } from './userHandlers';
+import express from 'express';
+import cors from 'cors';
 import { getDb } from './db';
+import userRoutes from './routes/user';
+import adminRoutes from './routes/admin';
+import { startPaymentMonitor } from './paymentMonitor';
+import { startAdminBot } from './adminBot';
+
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 async function main() {
-  getDb(); // initialise + migrate DB
+  // Init DB
+  getDb();
+  // Express API
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
 
-  const token = process.env.BOT_TOKEN;
-  if (!token) throw new Error('BOT_TOKEN is not set in .env');
+  app.get('/health', (_, res) => res.json({ ok: true }));
+  app.use('/api/user', userRoutes);
+  app.use('/api/admin', adminRoutes);
 
-  const bot = new Bot(token);
+  app.listen(PORT, () => console.log(`[API] Running on port ${PORT}`));
 
-  // Order matters: user handlers registered first,
-  // admin handlers added on top (they check isAdmin internally)
-  registerUserHandlers(bot);
-  registerAdminHandlers(bot);
+  // Background payment monitor + expiry job
+  startPaymentMonitor();
 
-  bot.catch((err) => console.error('Bot error:', err.message));
-
-  console.log('🤖 Starting bot…');
-  await bot.start({
-    onStart: (info) => console.log(`✅ Running as @${info.username}`),
-  });
+  // Admin Telegram bot (optional — comment out if using API only)
+  startAdminBot();
 }
 
-main().catch(console.error);
+main().catch(e => {
+  console.error('Startup error:', e);
+  process.exit(1);
+});

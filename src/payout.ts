@@ -1,82 +1,58 @@
-// src/payout.ts  — separate module so it can run independently of the bot callback
-
-import { getBet, getWinnersForBet, markPaidOut, Position } from './db';
+import { getBet, getConfirmedWinnersForBet, markPaidOut, Position } from './db';
 import { sendTon, calculatePayout } from './ton';
 
 export interface PayoutResult {
-  pos: Position;
+  positionId: number;
+  userId: number;
+  username: string | null;
   payout: number;
   success: boolean;
   error?: string;
 }
 
-/**
- * Attempt to send TON with retries.
- * Tries up to `maxAttempts` times with exponential backoff.
- */
-async function sendWithRetry(
-  address: string,
-  amount: number,
-  comment: string,
-  maxAttempts = 3
-): Promise<void> {
-  let lastError: Error | undefined;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+async function sendWithRetry(address: string, amount: number, comment: string, attempts = 3): Promise<void> {
+  let last: Error | undefined;
+  for (let i = 1; i <= attempts; i++) {
     try {
       await sendTon(address, amount, comment);
-      return; // success
+      return;
     } catch (e) {
-      lastError = e as Error;
-      if (attempt < maxAttempts) {
-        // exponential backoff: 2s, 4s, 8s
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-      }
+      last = e as Error;
+      if (i < attempts) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
     }
   }
-
-  throw lastError;
+  throw last;
 }
 
-/**
- * Pay out all winners for a resolved bet.
- * Runs all payouts concurrently with per-tx retry.
- * Returns results for each position so caller can report status.
- */
 export async function payoutBet(betId: number): Promise<PayoutResult[]> {
   const bet = getBet(betId);
   if (!bet || bet.status !== 'resolved' || !bet.result) {
     throw new Error(`Bet #${betId} is not resolved`);
   }
 
-  const winners     = getWinnersForBet(betId, bet.result as 'yes' | 'no');
+  const winners = getConfirmedWinnersForBet(betId, bet.result as 'yes' | 'no');
   const winningPool = bet.result === 'yes' ? bet.yes_pool : bet.no_pool;
-  const totalPool   = bet.yes_pool + bet.no_pool;
+  const totalPool = bet.yes_pool + bet.no_pool;
 
-  // Run all payouts in parallel
+  if (winners.length === 0) return [];
+
   const results = await Promise.allSettled(
     winners.map(async (pos): Promise<PayoutResult> => {
-      if (!pos.ton_address) {
-        return { pos, payout: 0, success: false, error: 'No TON address on file' };
-      }
-
       const payout = calculatePayout(pos.amount_ton, winningPool, totalPool);
 
-      await sendWithRetry(pos.ton_address, payout, `Win BET-${betId}`, 3);
-
-      // Only mark paid after successful send
+      await sendWithRetry(pos.ton_address, payout, `Win BET-${betId}`);
       markPaidOut(pos.id);
 
-      return { pos, payout, success: true };
+      return { positionId: pos.id, userId: pos.user_id, username: pos.username, payout, success: true };
     })
   );
 
-  // Unwrap allSettled results
   return results.map((r, i) => {
     if (r.status === 'fulfilled') return r.value;
-    // If the whole promise rejected unexpectedly
     return {
-      pos: winners[i],
+      positionId: winners[i].id,
+      userId: winners[i].user_id,
+      username: winners[i].username,
       payout: 0,
       success: false,
       error: r.reason?.message ?? 'Unknown error',

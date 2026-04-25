@@ -1,4 +1,4 @@
-import { TonClient, WalletContractV4, internal, toNano, fromNano, Address, WalletContractV3R1, WalletContractV2R1 } from '@ton/ton';
+import { TonClient, WalletContractV4, internal, toNano, fromNano, Address } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 
 export function getTonClient(): TonClient {
@@ -18,27 +18,21 @@ export async function getAdminWallet() {
 
 export async function getAdminAddress(): Promise<string> {
   const { wallet } = await getAdminWallet();
-  return wallet.address.toString({ bounceable: false , testOnly: true });
+  return wallet.address.toString({ bounceable: false });
 }
 
 export async function getAdminBalance(): Promise<string> {
   const client = getTonClient();
   const { wallet } = await getAdminWallet();
-  const contract = client.open(wallet);
-  const balance = await contract.getBalance();
+  const balance = await client.open(wallet).getBalance();
   return fromNano(balance);
 }
 
-/**
- * Send TON from the admin wallet to a recipient address.
- * This is how winners receive their payouts.
- */
 export async function sendTon(toAddress: string, amountTon: number, comment: string): Promise<void> {
   const client = getTonClient();
   const { wallet, keyPair } = await getAdminWallet();
   const contract = client.open(wallet);
   const seqno = await contract.getSeqno();
-
   await contract.sendTransfer({
     secretKey: keyPair.secretKey,
     seqno,
@@ -51,46 +45,60 @@ export async function sendTon(toAddress: string, amountTon: number, comment: str
       }),
     ],
   });
-
-  // Wait a couple seconds between sends to avoid seqno collision
-  await new Promise(r => setTimeout(r, 2000));
+  // Space out sends to avoid seqno conflicts
+  await new Promise(r => setTimeout(r, 2500));
 }
 
-/**
- * Build a ton:// deep link so user can pay from their TON wallet app.
- * Comment encodes: BET-<betId>-<side>-<userId>
- */
 export function buildPaymentLink(
-  toAddress: string,
-  amountTon: number,
-  betId: number,
-  side: 'yes' | 'no',
-  userId: number
+  toAddress: string, amountTon: number,
+  betId: number, side: 'yes' | 'no', positionId: number
 ): string {
-  const comment = encodeURIComponent(`BET-${betId}-${side}-${userId}`);
+  const comment = encodeURIComponent(`BET-${betId}-${side}-${positionId}`);
   const nanotons = Math.floor(amountTon * 1e9);
   return `ton://transfer/${toAddress}?amount=${nanotons}&text=${comment}`;
 }
 
-/**
- * Calculate winner payout.
- * Formula: (their_stake / winning_pool) * total_pool * (1 - fee)
- */
 export function calculatePayout(stake: number, winningPool: number, totalPool: number): number {
-  if (winningPool === 0) return stake; // full refund if nobody on winning side
-  const gross = (stake / winningPool) * totalPool;
-  const afterFee = gross * 0.98; // 2% house fee
-  return +afterFee.toFixed(6);
+  if (winningPool === 0) return stake;
+  return +((stake / winningPool) * totalPool * 0.98).toFixed(6);
+}
+
+export function computeOdds(yesPool: number, noPool: number) {
+  const total = yesPool + noPool;
+  if (total === 0) return { yesOdds: null, noOdds: null };
+  return {
+    yesOdds: yesPool > 0 ? +(total / yesPool).toFixed(3) : null,
+    noOdds: noPool > 0 ? +(total / noPool).toFixed(3) : null,
+  };
+}
+
+export function isValidTonAddress(addr: string): boolean {
+  try { Address.parse(addr); return true; } catch { return false; }
 }
 
 /**
- * Validate a TON address string (basic check).
+ * Fetch recent incoming transactions for the admin wallet from toncenter.
+ * Returns raw transaction objects from the toncenter v2 API.
  */
-export function isValidTonAddress(addr: string): boolean {
-  try {
-    Address.parse(addr);
-    return true;
-  } catch {
-    return false;
-  }
+export async function fetchRecentTransactions(limit = 50): Promise<ToncenterTx[]> {
+  const address = await getAdminAddress();
+  const base = process.env.TON_NETWORK === 'mainnet'
+    ? 'https://toncenter.com/api/v2'
+    : 'https://testnet.toncenter.com/api/v2';
+
+  const url = `${base}/getTransactions?address=${address}&limit=${limit}&archival=false`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Toncenter error: ${res.status}`);
+  const json = await res.json() as { ok: boolean; result: ToncenterTx[] };
+  if (!json.ok) throw new Error('Toncenter returned ok=false');
+  return json.result;
+}
+
+export interface ToncenterTx {
+  transaction_id: { hash: string; lt: string };
+  in_msg?: {
+    source: string;
+    value: string;       // nanotons as string
+    message?: string;    // comment
+  };
 }
