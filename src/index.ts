@@ -114,7 +114,7 @@ async function main() {
   // Background payment monitor + expiry job
   startPaymentMonitor();
 
-  // Admin Telegram bot
+  // Admin Telegram bo
   startAdminBot();
 }
 
