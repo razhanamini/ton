@@ -3,7 +3,7 @@ name: Deploy Backend to VPS
 on:
   push:
     branches: [main]
-
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -21,13 +21,13 @@ jobs:
         run: |
           docker save ton-bot:latest | gzip > ton-bot.tar.gz
       
-      - name: Copy image to VPS
+      - name: Copy files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "ton-bot.tar.gz"
+          source: "ton-bot.tar.gz,docker-compose.yml"
           target: "/root/backend/"
       
       - name: Deploy on VPS
@@ -37,8 +37,27 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            # Create network if not exists
+            docker network create ton-network 2>/dev/null || true
+            
             cd /root/backend/
+            
+            # Create .env file from secrets
+            cat > .env << EOF
+            TON_API_KEY=${{ secrets.TON_API_KEY }}
+            ADMIN_ID=${{ secrets.ADMIN_ID }}
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            ADMIN_MNEMONIC="${{ secrets.ADMIN_MNEMONIC }}"
+            TON_NETWORK=${{ secrets.TON_NETWORK }}
+            EOF
+            
+            # Create data directory
+            mkdir -p data
+            
             docker load < ton-bot.tar.gz
-            docker-compose down backend || true
-            docker-compose up -d backend
+            docker-compose down || true
+            docker-compose up -d
             docker system prune -f
+            
+            # Cleanup
+            rm ton-bot.tar.gz
