@@ -23,6 +23,16 @@ async function main() {
 
   app.listen(PORT, () => console.log(`[API] Running on port ${PORT}`));
 
+  app.get('/health', (req, res) => {
+    res.status(200).send('OK')
+  })
+
+  // Also add CORS for development
+  app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:8080'],
+    credentials: true
+  }))
+
   // Background payment monitor + expiry job
   startPaymentMonitor();
 
@@ -34,3 +44,4 @@ main().catch(e => {
   console.error('Startup error:', e);
   process.exit(1);
 });
+
