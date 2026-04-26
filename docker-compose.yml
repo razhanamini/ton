@@ -1,41 +1,63 @@
-services:
-  backend:
-    image: ton-bot:latest  # Use pre-built image from backend repo
-    container_name: ton-backend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - TON_API_KEY=${TON_API_KEY}
-      - ADMIN_ID=${ADMIN_ID}
-    volumes:
-      - ./data:/app/data
-    networks:
-      - ton-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+name: Deploy Backend to VPS
 
-  frontend:
-    image: ton-frontend:latest  # Use pre-built image from frontend repo
-    container_name: ton-frontend
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - ton-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-networks:
-  ton-network:
-    driver: bridge
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image
+        run: |
+          docker build -t ton-bot:latest .
+      
+      - name: Save and compress image
+        run: |
+          docker save ton-bot:latest | gzip > ton-bot.tar.gz
+      
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "ton-bot.tar.gz,docker-compose.yml"
+          target: "/root/backend/"
+      
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # Create network if not exists
+            docker network create ton-network 2>/dev/null || true
+            
+            cd /root/backend/
+            
+            # Create .env file from secrets
+            cat > .env << EOF
+            TON_API_KEY=${{ secrets.TON_API_KEY }}
+            ADMIN_ID=${{ secrets.ADMIN_ID }}
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            ADMIN_MNEMONIC="${{ secrets.ADMIN_MNEMONIC }}"
+            TON_NETWORK=${{ secrets.TON_NETWORK }}
+            EOF
+            
+            # Create data directory
+            mkdir -p data
+            
+            docker load < ton-bot.tar.gz
+            docker-compose down || true
+            docker-compose up -d
+            docker system prune -f
+            
+            # Cleanup
+            rm ton-bot.tar.gz

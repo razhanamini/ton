@@ -1,60 +1,3 @@
-# name: Deploy to VPS
-
-# on:
-#   push:
-#     branches: [main]
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-    
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-      
-#       - name: Build Docker image
-#         run: |
-#           docker build -t ton-bot:latest .
-      
-#       - name: Save and compress image
-#         run: |
-#           docker save ton-bot:latest | gzip > ton-bot.tar.gz
-      
-#       - name: Copy image to VPS
-#         uses: appleboy/scp-action@v0.1.7
-#         with:
-#           host: ${{ secrets.VPS_HOST }}
-#           username: ${{ secrets.VPS_USER }}
-#           key: ${{ secrets.VPS_SSH_KEY }}
-#           source: "ton-bot.tar.gz"
-#           target: "/root/ton-bot/"  # Changed from /home/***/ton-bot/
-      
-#       - name: Deploy on VPS
-#         uses: appleboy/ssh-action@v1.0.3
-#         with:
-#           host: ${{ secrets.VPS_HOST }}
-#           username: ${{ secrets.VPS_USER }}
-#           key: ${{ secrets.VPS_SSH_KEY }}
-#           script: |
-#             # Install Docker if not present
-#             if ! command -v docker &> /dev/null; then
-#               curl -fsSL https://get.docker.com | sh
-#             fi
-            
-#             # Install Docker Compose if not present
-#             if ! command -v docker-compose &> /dev/null; then
-#               curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-#               chmod +x /usr/local/bin/docker-compose
-#             fi
-            
-#             cd /root/ton-bot/
-#             docker load < ton-bot.tar.gz
-#             docker-compose down || true
-#             docker-compose up -d
-#             docker system prune -f
-
-
-
 name: Deploy Backend to VPS
 
 on:
@@ -85,7 +28,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "ton-bot.tar.gz"
-          target: "/root/ton-app/"
+          target: "/root/backend/"
       
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -94,7 +37,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /root/ton-app/
+            cd /root/backend/
             docker load < ton-bot.tar.gz
             docker-compose down backend || true
             docker-compose up -d backend
