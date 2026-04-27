@@ -44,12 +44,27 @@ export interface TelegramUser {
 }
 
 // Express middleware — attaches req.telegramUser or returns 401
+// Express middleware — attaches req.telegramUser or returns 401
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Development mode - allow testing from browser
+  if (req.headers['x-dev-mode'] === 'true' && process.env.NODE_ENV !== 'production') {
+    console.log('Dev mode: skipping auth');
+    (req as any).telegramUser = { id: 123456, username: 'dev_user' };
+    return next();
+  }
+
+  // Production - validate Telegram auth
   const initData = req.headers['x-telegram-init-data'] as string;
-  if (!initData) return res.status(401).json({ error: 'Missing Telegram auth' });
+  if (!initData) {
+    console.log('Missing Telegram auth header');
+    return res.status(401).json({ error: 'Missing Telegram auth' });
+  }
 
   const user = validateTelegramAuth(initData);
-  if (!user) return res.status(401).json({ error: 'Invalid Telegram auth' });
+  if (!user) {
+    console.log('Invalid Telegram auth');
+    return res.status(401).json({ error: 'Invalid Telegram auth' });
+  }
 
   (req as any).telegramUser = user;
   next();
