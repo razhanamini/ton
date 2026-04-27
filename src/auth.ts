@@ -86,6 +86,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: 'Invalid Telegram auth' });
   }
 
+  console.log("Connected the Auth Successfully");
   (req as any).telegramUser = user;
   next();
 }
