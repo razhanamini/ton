@@ -11,40 +11,41 @@ const BOT_TOKEN = process.env.BOT_TOKEN || ''; // Your bot token from @BotFather
 
 export function validateTelegramAuth(initData: string): any | null {
   try {
+
     // Parse the initData string into a URLSearchParams object
     const params = new URLSearchParams(initData);
-    
+
     // Get the hash that Telegram sent
     const hash = params.get('hash');
     if (!hash) return null;
-    
+
     // Remove the hash from the params for validation
     params.delete('hash');
-    
+
     // Sort the remaining parameters alphabetically by key
     const keys = Array.from(params.keys()).sort();
     const dataCheckString = keys
       .map(key => `${key}=${params.get(key)}`)
       .join('\n');
-    
+
     // Create secret key: HMAC-SHA256 of "WebAppData" with bot token as key
     const secretKey = crypto
       .createHmac('sha256', 'WebAppData')
       .update(BOT_TOKEN)
       .digest();
-    
+
     // Create signature: HMAC-SHA256 of dataCheckString with secretKey
     const signature = crypto
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
       .digest('hex');
-    
+
     // Compare signatures
     if (signature !== hash) {
       console.error('Invalid hash signature');
       return null;
     }
-    
+
     // Check if the data is not older than 1 day (optional, but recommended)
     const authDate = parseInt(params.get('auth_date') || '0');
     const now = Math.floor(Date.now() / 1000);
@@ -52,11 +53,11 @@ export function validateTelegramAuth(initData: string): any | null {
       console.error('Auth data expired');
       return null;
     }
-    
+
     // Parse and return the user data
     const user = JSON.parse(params.get('user') || '{}');
     return user;
-    
+
   } catch (error) {
     console.error('Validation error:', error);
     return null;
@@ -68,7 +69,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   // Development mode - allow testing from browser
   if (req.headers['x-dev-mode'] === 'true' && process.env.NODE_ENV !== 'production') {
     console.log('Dev mode: skipping auth');
-    (req as any).telegramUser = { id: 123456, username: 'dev_user' };
+    (req as any).telegramUser = { id: 7038460765, username: 'dev_user' };
+    return next();
+  }
+
+  if (req.headers['x-dev-mode-user'] === 'true' && process.env.NODE_ENV !== 'production') {
+    console.log('Dev mode: skipping auth');
+    (req as any).telegramUser = { id: 1234567, username: 'dev_user' };
     return next();
   }
 

@@ -1,12 +1,34 @@
 import Database from 'better-sqlite3';
-
-const DB_PATH = process.env.DB_PATH || './bets.db';
+import path from 'path';
+import fs from 'fs'
+const DB_PATH = process.env.DB_PATH || '../data/bets.db';
 let db: Database.Database;
+
+
 
 export function getDb(): Database.Database {
   if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
+    // Use DATABASE_PATH from .env or default
+    const dbPath = process.env.DATABASE_PATH || './data/bets.db';
+    
+    // Get the directory path
+    const dbDir = path.dirname(dbPath);
+    
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log(`Created database directory: ${dbDir}`);
+    }
+    
+    console.log(`Opening database at: ${dbPath}`);
+    
+    // Open database
+    db = new Database(dbPath);
+    
+    // Enable foreign keys
+    db.pragma('foreign_keys = ON');
+    
+    // Create tables
     migrate(db);
   }
   return db;
